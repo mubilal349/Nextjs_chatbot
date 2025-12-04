@@ -3,11 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Send, Sparkles, Trash2, Menu, X } from "lucide-react";
+import { Send, Menu, X, MessageSquare, Plus, Sun, Moon } from "lucide-react";
+import Head from "next/head";
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  timestamp: Date;
 };
 
 export default function Home() {
@@ -15,8 +17,57 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load theme preference and chat history from localStorage on mount
+  useEffect(() => {
+    // Load theme preference
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "dark") {
+      setIsDarkMode(true);
+      document.documentElement.classList.add("dark");
+    } else {
+      setIsDarkMode(false);
+      document.documentElement.classList.remove("dark");
+    }
+
+    // Load chat history
+    const savedMessages = localStorage.getItem("chatHistory");
+    if (savedMessages) {
+      try {
+        const parsedMessages = JSON.parse(savedMessages);
+        // Convert timestamp strings back to Date objects
+        const messagesWithDates = parsedMessages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp),
+        }));
+        setMessages(messagesWithDates);
+      } catch (error) {
+        console.error("Error parsing saved messages:", error);
+      }
+    }
+  }, []);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem("chatHistory", JSON.stringify(messages));
+    }
+  }, [messages]);
+
+  // Toggle theme
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    localStorage.setItem("theme", newTheme ? "dark" : "light");
+    if (newTheme) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -26,7 +77,49 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
-  const formatBotResponse = (text: string) => {
+  // Function to format long responses as bullet points
+  const formatResponse = (text: string) => {
+    // Check if response is long (more than 200 characters or has multiple paragraphs)
+    const isLongResponse = text.length > 200 || text.split(/\n\n/).length > 2;
+
+    if (!isLongResponse) {
+      return text;
+    }
+
+    // Split by paragraphs or double newlines
+    const paragraphs = text.split(/\n\n/);
+
+    // If there are multiple paragraphs, format as bullet points
+    if (paragraphs.length > 1) {
+      return paragraphs
+        .map((para) => {
+          // Remove any leading/trailing whitespace
+          const trimmed = para.trim();
+          // Skip empty paragraphs
+          if (!trimmed) return "";
+          // Return as bullet point
+          return `• ${trimmed}`;
+        })
+        .filter(Boolean) // Remove empty strings
+        .join("\n\n");
+    }
+
+    // If it's a single long paragraph, split by sentences
+    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+
+    // If there are many sentences, format as bullet points
+    if (sentences.length > 3) {
+      return sentences
+        .map((sentence) => {
+          const trimmed = sentence.trim();
+          if (!trimmed) return "";
+          return `• ${trimmed}`;
+        })
+        .filter(Boolean)
+        .join("\n\n");
+    }
+
+    // Otherwise, return the original text
     return text;
   };
 
@@ -36,6 +129,7 @@ export default function Home() {
     const userMessage: ChatMessage = {
       role: "user",
       content: input,
+      timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -53,7 +147,8 @@ export default function Home() {
 
       const botMessage: ChatMessage = {
         role: "assistant",
-        content: formatBotResponse(data.reply),
+        content: formatResponse(data.reply),
+        timestamp: new Date(),
       };
 
       setMessages((prev) => [...prev, botMessage]);
@@ -63,6 +158,7 @@ export default function Home() {
         role: "assistant",
         content:
           "Sorry, I encountered an error while processing your request. Please try again later.",
+        timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -81,242 +177,346 @@ export default function Home() {
   const clearChat = () => {
     setMessages([]);
     setIsSidebarOpen(false);
+    localStorage.removeItem("chatHistory");
+  };
+
+  // Format time for display
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   return (
-    <div className="flex h-screen bg-black text-white overflow-hidden">
-      {/* Sidebar - Mobile */}
+    <>
+      <Head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </Head>
       <div
-        className={`fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden transition-opacity duration-300 ${
-          isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        className={`flex h-screen overflow-hidden font-sans ${
+          isDarkMode ? "bg-gray-900" : "bg-white"
         }`}
-        onClick={() => setIsSidebarOpen(false)}
-      />
-
-      {/* Sidebar */}
-      <div
-        className={`fixed lg:static inset-y-0 left-0 w-64 bg-zinc-950 border-r border-zinc-800 z-50 transform transition-transform duration-300 lg:transform-none ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        style={{
+          fontFamily:
+            "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        }}
       >
-        <div className="flex flex-col h-full p-4">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <span className="font-bold text-lg">AI Chat</span>
-            </div>
+        {/* Sidebar - Mobile */}
+        <div
+          className={`fixed inset-0 z-40 lg:hidden transition-opacity duration-300 ${
+            isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          } ${isDarkMode ? "bg-gray-800" : "bg-gray-500"} bg-opacity-50`}
+          onClick={() => setIsSidebarOpen(false)}
+        />
+
+        {/* Sidebar */}
+        <div
+          className={`fixed lg:static inset-y-0 left-0 w-64 z-50 transform transition-transform duration-300 lg:transform-none ${
+            isSidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full lg:translate-x-0"
+          } ${
+            isDarkMode
+              ? "bg-gray-800 border-gray-700"
+              : "bg-gray-50 border-gray-200"
+          } border-r`}
+        >
+          <div className="flex flex-col h-full p-4">
             <button
-              onClick={() => setIsSidebarOpen(false)}
-              className="lg:hidden text-zinc-400 hover:text-white transition-colors"
+              onClick={clearChat}
+              className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg border transition-colors ${
+                isDarkMode
+                  ? "border-gray-600 hover:bg-gray-700 text-white"
+                  : "border-gray-300 hover:bg-gray-100 text-black"
+              }`}
             >
-              <X className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
+              <span className="text-sm font-medium">New chat</span>
             </button>
-          </div>
 
-          <button
-            onClick={clearChat}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-zinc-900 hover:bg-zinc-800 transition-colors border border-zinc-800 hover:border-zinc-700"
-          >
-            <Trash2 className="w-4 h-4" />
-            <span className="text-sm cursor-pointer">Clear Conversation</span>
-          </button>
+            <div className="flex-1 mt-4">
+              <div
+                className={`text-xs font-semibold uppercase tracking-wide mb-2 ${
+                  isDarkMode ? "text-white" : "text-black"
+                }`}
+              >
+                Today
+              </div>
+              <div className="space-y-1">
+                {messages.length > 0 && (
+                  <div
+                    className={`px-3 py-2 rounded-lg cursor-pointer text-sm truncate ${
+                      isDarkMode
+                        ? "hover:bg-gray-700 text-white"
+                        : "hover:bg-gray-100 text-black"
+                    }`}
+                  >
+                    {messages[0].content.slice(0, 30)}...
+                  </div>
+                )}
+              </div>
+            </div>
 
-          <div className="flex-1" />
-
-          <div className="text-xs text-zinc-500 space-y-1">
-            <p>AI Assistant v2.0</p>
-            <p>Powered by Next.js</p>
+            <div
+              className={`text-xs ${isDarkMode ? "text-white" : "text-black"}`}
+            >
+              <p>AI Assistant</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <div className="bg-zinc-950 border-b border-zinc-800 px-4 lg:px-6 py-4">
-          <div className="max-w-4xl mx-auto flex items-center justify-between">
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Header */}
+          <div
+            className={`px-4 py-3 flex items-center justify-between ${
+              isDarkMode
+                ? "bg-gray-900 border-gray-700"
+                : "bg-white border-gray-200"
+            } border-b`}
+          >
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="lg:hidden text-zinc-400 hover:text-white transition-colors"
+                className={`lg:hidden transition-colors ${
+                  isDarkMode
+                    ? "text-gray-400 hover:text-white"
+                    : "text-gray-500 hover:text-black"
+                }`}
               >
-                <Menu className="w-6 h-6" />
+                <Menu className="w-5 h-5" />
               </button>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center lg:hidden">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <h1 className="text-lg lg:text-xl font-semibold bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-                  AI Assistant
-                </h1>
-              </div>
+              <h1
+                className={`text-lg font-medium ${
+                  isDarkMode ? "text-white" : "text-black"
+                }`}
+              >
+                AI Assistant
+              </h1>
             </div>
-            <button
-              onClick={clearChat}
-              className="hidden lg:flex items-center cursor-pointer gap-2 text-sm text-zinc-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-zinc-900"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Clear</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleTheme}
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode
+                    ? "hover:bg-gray-800 text-white"
+                    : "hover:bg-gray-100 text-black"
+                }`}
+                aria-label="Toggle theme"
+              >
+                {isDarkMode ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
+              </button>
+              <button
+                onClick={clearChat}
+                className={`hidden lg:flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                  isDarkMode
+                    ? "text-white hover:bg-gray-800"
+                    : "text-black hover:bg-gray-100"
+                }`}
+              >
+                <Plus className="w-4 h-4" />
+                <span className="font-medium">New chat</span>
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Chat Container */}
-        <div className="flex-1 overflow-hidden">
-          <div className="h-full max-w-4xl mx-auto flex flex-col">
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto px-4 py-6">
-              {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center p-4 lg:p-8">
-                  <div className="w-16 h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-purple-500 via-pink-500 to-blue-500 rounded-2xl flex items-center justify-center mb-6 animate-pulse">
-                    <Sparkles className="w-8 h-8 lg:w-10 lg:h-10" />
-                  </div>
-                  <h2 className="text-xl lg:text-2xl font-bold mb-3 bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
-                    Welcome to AI Assistant
-                  </h2>
-                  <p className="text-zinc-400 max-w-md text-sm lg:text-base">
-                    Start a conversation and experience intelligent responses
-                    powered by advanced AI
-                  </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-8 w-full max-w-2xl">
-                    {[
-                      { icon: "💡", text: "Get creative ideas" },
-                      { icon: "📊", text: "Analyze data" },
-                      { icon: "✍️", text: "Write content" },
-                      { icon: "🔍", text: "Research topics" },
-                    ].map((item, i) => (
-                      <div
-                        key={i}
-                        className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 hover:border-zinc-700 transition-colors cursor-pointer"
-                        onClick={() => setInput(item.text)}
-                      >
-                        <span className="text-2xl mb-2 block">{item.icon}</span>
-                        <span className="text-sm text-zinc-300">
-                          {item.text}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {messages.map((msg, i) => (
+          {/* Chat Container */}
+          <div className="flex-1 overflow-hidden">
+            <div className="h-full max-w-3xl mx-auto flex flex-col">
+              {/* Messages Area */}
+              <div className="flex-1 overflow-y-auto px-4 py-6">
+                {messages.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
                     <div
-                      key={i}
-                      className={`flex gap-3 lg:gap-4 ${
-                        msg.role === "user" ? "justify-end" : "justify-start"
+                      className={`w-12 h-12 rounded-full flex items-center justify-center mb-4 ${
+                        isDarkMode ? "bg-gray-800" : "bg-gray-100"
                       }`}
                     >
-                      {msg.role === "assistant" && (
-                        <div className="flex-shrink-0 w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                          <Sparkles className="w-4 h-4 lg:w-5 lg:h-5" />
-                        </div>
-                      )}
+                      <MessageSquare
+                        className={`w-6 h-6 ${
+                          isDarkMode ? "text-gray-400" : "text-gray-600"
+                        }`}
+                      />
+                    </div>
+                    <h2
+                      className={`text-2xl font-semibold mb-2 ${
+                        isDarkMode ? "text-white" : "text-black"
+                      }`}
+                    >
+                      How can I help you today?
+                    </h2>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {messages.map((msg, i) => (
                       <div
-                        className={`max-w-[85%] lg:max-w-3xl px-4 py-3 rounded-2xl ${
-                          msg.role === "user"
-                            ? "bg-gradient-to-br from-blue-600 to-purple-600"
-                            : "bg-zinc-900 border border-zinc-800"
+                        key={i}
+                        className={`flex gap-4 ${
+                          msg.role === "user" ? "justify-end" : "justify-start"
                         }`}
                       >
-                        <div className="prose prose-invert prose-sm lg:prose-base max-w-none">
-                          {msg.role === "assistant" ? (
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {msg.content}
-                            </ReactMarkdown>
-                          ) : (
-                            <p className="whitespace-pre-wrap m-0">
-                              {msg.content}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {msg.role === "user" && (
-                        <div className="flex-shrink-0 w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center font-bold text-sm lg:text-base">
-                          U
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {isLoading && (
-                    <div className="flex gap-3 lg:gap-4 justify-start">
-                      <div className="flex-shrink-0 w-8 h-8 lg:w-10 lg:h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 lg:w-5 lg:h-5" />
-                      </div>
-                      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3">
-                        <div className="flex space-x-1.5">
-                          <div className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce"></div>
+                        {msg.role === "assistant" && (
                           <div
-                            className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce"
-                            style={{ animationDelay: "0.1s" }}
-                          ></div>
+                            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                              isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                            }`}
+                          >
+                            <MessageSquare
+                              className={`w-4 h-4 ${
+                                isDarkMode ? "text-gray-400" : "text-gray-600"
+                              }`}
+                            />
+                          </div>
+                        )}
+                        <div
+                          className={`max-w-[85%] lg:max-w-2xl px-4 py-3 rounded-lg ${
+                            msg.role === "user"
+                              ? "bg-blue-500 text-white"
+                              : isDarkMode
+                              ? "bg-gray-800 text-white"
+                              : "bg-gray-100 text-black"
+                          }`}
+                        >
                           <div
-                            className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce"
-                            style={{ animationDelay: "0.2s" }}
-                          ></div>
+                            className={`prose prose-sm max-w-none ${
+                              isDarkMode ? "prose-invert" : ""
+                            }`}
+                            style={{
+                              fontFamily:
+                                "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                              fontSize: "0.95rem",
+                              lineHeight: "1.6",
+                            }}
+                          >
+                            {msg.role === "assistant" ? (
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {msg.content}
+                              </ReactMarkdown>
+                            ) : (
+                              <p className="whitespace-pre-wrap m-0">
+                                {msg.content}
+                              </p>
+                            )}
+                          </div>
+                          <div
+                            className={`text-xs mt-2 ${
+                              msg.role === "user"
+                                ? "text-blue-100"
+                                : isDarkMode
+                                ? "text-gray-400"
+                                : "text-gray-500"
+                            }`}
+                          >
+                            {formatTime(msg.timestamp)}
+                          </div>
+                        </div>
+                        {msg.role === "user" && (
+                          <div className="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-medium">
+                            U
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {isLoading && (
+                      <div className="flex gap-4 justify-start">
+                        <div
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                            isDarkMode ? "bg-gray-700" : "bg-gray-100"
+                          }`}
+                        >
+                          <MessageSquare
+                            className={`w-4 h-4 ${
+                              isDarkMode ? "text-gray-400" : "text-gray-600"
+                            }`}
+                          />
+                        </div>
+                        <div
+                          className={`rounded-lg px-4 py-3 ${
+                            isDarkMode ? "bg-gray-800" : "bg-gray-100"
+                          }`}
+                        >
+                          <div className="flex space-x-1">
+                            <div
+                              className={`w-2 h-2 rounded-full animate-bounce ${
+                                isDarkMode ? "bg-gray-500" : "bg-gray-400"
+                              }`}
+                            ></div>
+                            <div
+                              className={`w-2 h-2 rounded-full animate-bounce ${
+                                isDarkMode ? "bg-gray-500" : "bg-gray-400"
+                              }`}
+                              style={{ animationDelay: "0.1s" }}
+                            ></div>
+                            <div
+                              className={`w-2 h-2 rounded-full animate-bounce ${
+                                isDarkMode ? "bg-gray-500" : "bg-gray-400"
+                              }`}
+                              style={{ animationDelay: "0.2s" }}
+                            ></div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Input Area */}
-            <div className="p-4 lg:p-6 border-t border-zinc-800 bg-black">
-              <div className="flex gap-2 lg:gap-3 items-end">
-                <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl focus-within:border-zinc-700 transition-colors">
-                  <input
-                    ref={inputRef}
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="w-full bg-transparent px-4 lg:px-5 py-3 lg:py-4 focus:outline-none text-sm lg:text-base"
-                    placeholder="Type your message..."
-                    disabled={isLoading}
-                  />
-                </div>
-                <button
-                  onClick={sendMessage}
-                  disabled={isLoading || !input.trim()}
-                  className="bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-2xl p-3 lg:p-4 disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 active:scale-95 flex-shrink-0"
-                >
-                  {isLoading ? (
-                    <svg
-                      className="animate-spin h-5 w-5 lg:h-6 lg:w-6"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                  ) : (
-                    <Send className="w-5 h-5 lg:w-6 lg:h-6 cursor-pointer" />
-                  )}
-                </button>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-zinc-500 mt-3 text-center">
-                AI can make mistakes. Verify important information.
-              </p>
+
+              {/* Input Area */}
+              <div
+                className={`px-4 py-4 border-t ${
+                  isDarkMode
+                    ? "bg-gray-900 border-gray-700"
+                    : "bg-white border-gray-200"
+                }`}
+              >
+                <div className="max-w-3xl mx-auto">
+                  <div className="flex gap-2 items-center">
+                    <input
+                      ref={inputRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      className={`flex-1 px-4 py-3 border rounded-lg focus:outline-none focus:border-blue-500 ${
+                        isDarkMode
+                          ? "bg-gray-800 border-gray-600 text-white placeholder-gray-400"
+                          : "bg-white border-gray-300 text-black placeholder-gray-500"
+                      }`}
+                      placeholder="Send a message..."
+                      disabled={isLoading}
+                      style={{
+                        fontFamily:
+                          "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                        fontSize: "0.95rem",
+                      }}
+                    />
+                    <button
+                      onClick={sendMessage}
+                      disabled={isLoading || !input.trim()}
+                      className="bg-blue-500 hover:bg-blue-600 text-white rounded-lg p-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <p
+                    className={`text-xs mt-2 text-center ${
+                      isDarkMode ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  >
+                    AI can make mistakes. Consider checking important
+                    information.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
