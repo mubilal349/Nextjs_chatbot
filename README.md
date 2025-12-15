@@ -1,3 +1,7 @@
+## Chatbot overview
+<img width="1920" height="859" alt="image" src="https://github.com/user-attachments/assets/0c6aaeb5-8255-4184-9ab5-51908849d0d5" />
+
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

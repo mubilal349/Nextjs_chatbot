@@ -225,7 +225,7 @@ export default function Home() {
           <div className="flex flex-col h-full p-4">
             <button
               onClick={clearChat}
-              className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg border transition-colors ${
+              className={`flex items-center gap-2 w-full px-3 py-2 rounded-lg border transition-colors cursor-pointer ${
                 isDarkMode
                   ? "border-gray-600 hover:bg-gray-700 text-white"
                   : "border-gray-300 hover:bg-gray-100 text-black"
@@ -279,7 +279,7 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className={`lg:hidden transition-colors ${
+                className={`lg:hidden transition-colors cursor-pointer ${
                   isDarkMode
                     ? "text-gray-400 hover:text-white"
                     : "text-gray-500 hover:text-black"
@@ -298,7 +298,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <button
                 onClick={toggleTheme}
-                className={`p-2 rounded-lg transition-colors ${
+                className={`p-2 rounded-lg transition-colors cursor-pointer ${
                   isDarkMode
                     ? "hover:bg-gray-800 text-white"
                     : "hover:bg-gray-100 text-black"
@@ -313,7 +313,7 @@ export default function Home() {
               </button>
               <button
                 onClick={clearChat}
-                className={`hidden lg:flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg transition-colors ${
+                className={`hidden lg:flex items-center gap-2 text-sm px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                   isDarkMode
                     ? "text-white hover:bg-gray-800"
                     : "text-black hover:bg-gray-100"
